@@ -6,9 +6,14 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266httpUpdate.h>
 
+struct TempStruct {
+  char host[15];
+  unsigned char temp;
+};
+
 struct RegisterStruct {
   char host[15];
-  unsigned char hasSensor;
+  bool hasSensor;
 };
 
 class SmartVentComm
@@ -33,11 +38,14 @@ class SmartVentComm
 
     // getters
     bool isConnected() { return connected; };
+    bool getCommand(unsigned char *);
 
     // methods
+    bool sendCommand(const char *, unsigned char);
+
     bool registerVent(unsigned char);
     bool sendTemperature(unsigned char);
-    bool receiveTemperature(unsigned char *, unsigned char *);
+    bool receiveTemperature(TempStruct *);
     bool getRegistration(RegisterStruct *);
     
 };

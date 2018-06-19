@@ -35,18 +35,11 @@ bool SmartVentComm::registerVent(unsigned char t)
     delay(100);
   }
 
-  client.println(hostName);
+  client.print(hostName);
   client.write(t);
 
   client.flush();
 
-  do {
-    delay(50);
-    id = client.read();
-  } while(id == 255);
-
-Serial.print("Assigned ID: ");
-Serial.println(id, DEC);
   client.stop();
 
   return true;
@@ -54,29 +47,22 @@ Serial.println(id, DEC);
 
 bool SmartVentComm::getRegistration(RegisterStruct *r)
 {
-  unsigned char nextID = 1;
-  byte x;
   WiFiClient client = regServer.available();
 
   if(!client) 
     return false;
 
-  client.readBytesUntil('\n', r->host, sizeof(r->host));
+  memset(r->host, '\0', sizeof(r->host));
+
+  client.readBytes(r->host, sizeof(r->host)-1);
   r->hasSensor = client.read();
-
-  Serial.print("Assigning ID ");
-  Serial.println(nextID);
-
-  client.write(nextID);
-
-  client.flush();
 
   client.stop();
 
   return true;
 }
 
-bool SmartVentComm::receiveTemperature(unsigned char *id, unsigned char *t)
+bool SmartVentComm::receiveTemperature(TempStruct *t)
 {
   WiFiClient client = comServer.available();
   unsigned char i;
@@ -85,25 +71,15 @@ bool SmartVentComm::receiveTemperature(unsigned char *id, unsigned char *t)
   if(!client) 
     return false;
 
-Serial.println("Receiving");
+  client.readBytes(t->host, sizeof(t->host)-1);
+  t->host[sizeof(t->host)] = '\0';
 
   do {
     delay(50);
-    i = client.read();
-  } while(i == 255);
 
-  do {
-    delay(50);
-    j = client.read();
-  } while(j == 255);
+    t->temp = client.read();
+  } while(t->temp == 255);
 
-Serial.print("Got ");
-Serial.print(i, DEC);
-Serial.print(" ");
-Serial.println(j, DEC);
-
-  id = &i;
-  t = &j;
   client.stop();
 
   return true;
@@ -113,6 +89,7 @@ bool SmartVentComm::sendTemperature(unsigned char t)
 {
   uint32_t elapsed;
   WiFiClient client;
+  TempStruct ts;
 
   client.connect("thermostat", comPort);
 
@@ -126,17 +103,58 @@ bool SmartVentComm::sendTemperature(unsigned char t)
     delay(100);
   }
  
+  strcpy(ts.host , hostName);
+  ts.temp = t;
+
 Serial.print("Sending ");
-Serial.print(id, DEC);
+Serial.print(ts.host);
 Serial.print(" ");
-Serial.println(t);
+Serial.println(ts.temp, DEC);
 
-  client.write(id);
+  client.print(ts.host);
 
-  client.write(t);
+  client.write(ts.temp);
 
   client.flush();
 
+  client.stop();
+
+  return true;
+}
+
+bool SmartVentComm::getCommand(unsigned char *c)
+{
+  WiFiClient client = comServer.available();
+
+  if(!client)
+    return false;
+
+  c = (unsigned char *)client.read();
+ 
+  client.stop();
+
+  return true;
+}
+
+bool SmartVentComm::sendCommand(const char *h, unsigned char c)
+{
+  uint32_t elapsed;
+  WiFiClient client;
+
+  client.connect(h, comPort);
+
+  elapsed = millis();
+
+  while(!client.connected()) {
+    if(millis() > elapsed + 10000) {
+      Serial.println("Connect failed after 10 seconds, aborting.");
+      return false;
+    }
+    delay(100);
+  }
+ 
+  client.write(c);
+  client.flush();
   client.stop();
 
   return true;
